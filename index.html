@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Systems Thinking Navigator</title>
+    <style>
+        :root {
+            --primary-bg: #f8f9fa;
+            --sidebar-bg: #ffffff;
+            --content-bg: #ffffff;
+            --text-color: #212529;
+            --primary-accent: #007bff;
+            --primary-accent-hover: #0056b3;
+            --border-color: #dee2e6;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --grid-border: #ced4da;
+            --agent-red: #dc3545;
+            --agent-blue: #007bff;
+            --empty-cell: #e9ecef;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --ai-tutor-bg: #e3f2fd;
+            --user-message-bg: #ffffff;
+            --ai-message-bg: #f1f3f5;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 2rem 1rem;
+            box-shadow: 2px 0 5px var(--shadow-color);
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar h1 {
+            font-size: 1.5rem;
+            margin-top: 0;
+            color: var(--primary-accent);
+            text-align: center;
+        }
+
+        .sidebar nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar nav li {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .sidebar nav li:hover {
+            background-color: #e9ecef;
+        }
+
+        .sidebar nav li.active {
+            background-color: var(--primary-accent);
+            color: white;
+            font-weight: 600;
+        }
+
+        .content {
+            flex-grow: 1;
+            padding: 2rem 3rem;
+            overflow-y: auto;
+        }
+
+        .module {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .module.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            font-size: 2rem;
+            border-bottom: 2px solid var(--primary-accent);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        h3 {
+            font-size: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        /* Schelling Simulation Styles */
+        .simulation-container {
+            display: flex;
+            gap: 2rem;
+            align-items: flex-start;
+        }
+        
+        .grid-container {
+            display: grid;
+            border: 1px solid var(--grid-border);
+        }
+        
+        .grid-cell {
+            width: 15px;
+            height: 15px;
+        }
+        
+        .grid-cell.red { background-color: var(--agent-red); border-radius: 50%; }
+        .grid-cell.blue { background-color: var(--agent-blue); border-radius: 50%; }
+        .grid-cell.empty { background-color: var(--empty-cell); }
+
+        .controls {
+            flex-basis: 300px;
+            flex-shrink: 0;
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .controls label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        
+        .controls input[type="range"] {
+            width: 100%;
+        }
+
+        .controls button, .ai-tutor-input button {
+            width: 100%;
+            padding: 0.75rem;
+            margin-top: 0.75rem;
+            border: none;
+            border-radius: 6px;
+            background-color: var(--primary-accent);
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .controls button:hover, .ai-tutor-input button:hover {
+            background-color: var(--primary-accent-hover);
+        }
+        .controls button:disabled, .ai-tutor-input button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .segregation-level {
+            margin-top: 1rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        /* Leverage Points Styles */
+        .leverage-pyramid {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .leverage-level {
+            cursor: pointer;
+            padding: 1rem;
+            margin: 2px 0;
+            background-color: #e9ecef;
+            color: #495057;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            font-weight: 600;
+        }
+
+        .leverage-level:hover {
+            transform: scale(1.02);
+            border-color: var(--primary-accent);
+        }
+        .leverage-level.level-12 { width: 100%; background-color: #e3f2fd; }
+        .leverage-level.level-10 { width: 90%; background-color: #bbdefb; }
+        .leverage-level.level-6 { width: 80%; background-color: #90caf9; }
+        .leverage-level.level-5 { width: 70%; background-color: #64b5f6; }
+        .leverage-level.level-3 { width: 60%; background-color: #42a5f5; color: white; }
+        .leverage-level.level-2 { width: 50%; background-color: #2196f3; color: white; }
+
+        .leverage-content {
+            display: none;
+            padding: 1.5rem;
+            margin-top: 1rem;
+            background: #f8f9fa;
+            border-left: 5px solid var(--primary-accent);
+            border-radius: 4px;
+        }
+        .leverage-content.active {
+            display: block;
+        }
+
+        /* AI Tutor Styles */
+        .ai-tutor-container {
+            background-color: var(--ai-tutor-bg);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            border: 1px solid #b3e5fc;
+        }
+
+        .ai-tutor-chatbox {
+            background-color: white;
+            height: 300px;
+            overflow-y: auto;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .chat-message {
+            margin-bottom: 1rem;
+            max-width: 85%;
+        }
+
+        .chat-message p {
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            margin: 0;
+        }
+        
+        .user-message {
+            margin-left: auto;
+        }
+
+        .user-message p {
+            background-color: var(--primary-accent);
+            color: white;
+            border-bottom-right-radius: 0;
+        }
+
+        .ai-message p {
+            background-color: var(--ai-message-bg);
+            border-bottom-left-radius: 0;
+        }
+
+        .ai-tutor-input {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .ai-tutor-input textarea {
+            flex-grow: 1;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 1rem;
+            resize: vertical;
+        }
+        
+        .ai-tutor-input button {
+            margin-top: 0;
+            width: auto;
+            flex-shrink: 0;
+        }
+
+        /* AI Feature Button */
+        .ai-feature-btn {
+            background-color: #e3f2fd;
+            color: var(--primary-accent);
+            border: 1px solid var(--primary-accent);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .ai-feature-btn:hover {
+            background-color: var(--primary-accent);
+            color: white;
+        }
+
+        /* AI Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            position: relative;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            cursor: pointer;
+            color: #6c757d;
+        }
+
+        #modal-body {
+            max-height: 60vh;
+            overflow-y: auto;
+            line-height: 1.7;
+        }
+        #modal-body p:first-child { margin-top: 0; }
+        #modal-body strong { color: var(--primary-accent); }
+
+        /* Generic UI Elements */
+        .card {
+            background: var(--content-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px var(--shadow-color);
+        }
+        
+        .decision-tree-step, .case-study {
+            margin-bottom: 2rem;
+        }
+
+        .decision-tree-step h4 {
+            margin-top: 0;
+        }
+
+        .practice-plan-week {
+            margin-bottom: 1.5rem;
+        }
+        
+        .practice-plan-week ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .practice-plan-week li {
+           position: relative;
+           padding-left: 30px;
+           margin-bottom: 0.5rem;
+        }
+        .practice-plan-week li::before {
+            content: '☐';
+            position: absolute;
+            left: 0;
+            font-size: 20px;
+            color: var(--primary-accent);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 992px) {
+            .app-container {
+                flex-direction: column;
+                height: auto;
+            }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                display: flex;
+                overflow-x: auto;
+                padding: 0.5rem;
+            }
+            .sidebar h1 { display: none; }
+            .sidebar nav ul {
+                display: flex;
+                flex-direction: row;
+                gap: 0.5rem;
+            }
+            .sidebar nav li {
+                white-space: nowrap;
+            }
+            .content {
+                padding: 1.5rem;
+            }
+            .simulation-container {
+                flex-direction: column;
+            }
+            .controls {
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .ai-tutor-input {
+                flex-direction: column;
+            }
+            .ai-tutor-input button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <h1>Systems Navigator</h1>
+            <nav>
+                <ul>
+                    <li data-module="schelling" class="active">1. The Schelling Discovery</li>
+                    <li data-module="leverage">2. The 12 Leverage Points</li>
+                    <li data-module="application">3. Applying Systems Thinking</li>
+                    <li data-module="decision-tree">4. Decision Tree</li>
+                    <li data-module="mistakes">5. Common Mistakes</li>
+                    <li data-module="practice-plan">6. Your Practice Plan</li>
+                    <li data-module="diagnosis">7. Individual vs. System</li>
+                    <li data-module="sandbox">8. Systems Sandbox (AI)</li>
+                </ul>
+            </nav>
+        </aside>
+        <main class="content">
+            <!-- Module 1: Schelling Simulation -->
+            <section id="schelling" class="module active">
+                <h2>1. The Schelling Discovery</h2>
+                <div class="card">
+                    <p>When good intentions create bad outcomes. Imagine choosing where to sit in a cafeteria. You aren't prejudiced, but you have a small preference: you'd like at least 30% of your neighbors to be like you (e.g., same major, interests).</p>
+                    <p>Use the simulation below. Even with a small preference, a surprising pattern emerges.</p>
+                </div>
+                <div class="simulation-container">
+                    <div id="grid-container" class="grid-container"></div>
+                    <div class="controls">
+                        <h3>Controls</h3>
+                        <div>
+                            <label for="similarity-slider">Similarity Preference: <span id="similarity-value">30%</span></label>
+                            <input type="range" id="similarity-slider" min="0" max="1" step="0.05" value="0.3">
+                        </div>
+                        <div class="segregation-level">Segregation: <span id="segregation-value">0%</span></div>
+                        <button id="step-btn">Step</button>
+                        <button id="run-btn">Run</button>
+                        <button id="reset-btn">Reset Grid</button>
+                        <button id="debrief-btn" class="ai-feature-btn" style="display: none;">✨ Debrief with Syd</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Module 2: Leverage Points -->
+            <section id="leverage" class="module">
+                <h2>2. The 12 Places You Can Push on Any System</h2>
+                <div class="card">
+                    <p>There are 12 different places you can 'push' to create change. Most people push in obvious places that don't work well. The most effective changes happen in less obvious places. Click on the levels of the pyramid below to learn more.</p>
+                </div>
+                <div class="leverage-pyramid" id="leverage-pyramid">
+                    <div class="leverage-level level-12" data-level="12">12: Parameters (Numbers, Amounts)</div>
+                    <div class="leverage-level level-10" data-level="10">10: Structure (Who Connects to Whom)</div>
+                    <div class="leverage-level level-6" data-level="6">6: Information (Who Knows What)</div>
+                    <div class="leverage-level level-5" data-level="5">5: Rules (What You Can/Can't Do)</div>
+                    <div class="leverage-level level-3" data-level="3">3: Goals (What Success Means)</div>
+                    <div class="leverage-level level-2" data-level="2">2: Paradigm (Basic Beliefs)</div>
+                </div>
+                <div id="leverage-details">
+                    <!-- Details will be injected here by JS -->
+                </div>
+            </section>
+
+            <!-- Module 3: Applying Systems Thinking -->
+            <section id="application" class="module">
+                <h2>3. Applying Systems Thinking to Schelling Patterns</h2>
+                <div class="card">
+                    <h3>When Is It a Schelling Problem?</h3>
+                    <ul>
+                        <li>Everyone has good intentions but bad outcomes keep happening.</li>
+                        <li>The same patterns keep emerging even with different people.</li>
+                        <li>Small individual preferences are creating big collective problems.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>Systems Solutions for Schelling Problems</h3>
+                    <p>Instead of trying to change individual preferences, redesign the system to work with human tendencies.</p>
+                    <h4>Level 10 (Structure) Solutions:</h4>
+                    <p>Create natural interaction opportunities. Design spaces and activities that make diverse interaction rewarding.</p>
+                    <h4>Level 5 (Rules) Solutions:</h4>
+                    <p>Create incentives for diverse collaboration. Establish rotation systems that naturally bring groups together.</p>
+                    <h4>Level 3 (Goals) Solutions:</h4>
+                    <p>Shift from preventing segregation to building integration that serves everyone's authentic interests.</p>
+                </div>
+            </section>
+            
+            <!-- Module 4: Decision Tree -->
+            <section id="decision-tree" class="module">
+                <h2>4. Decision Tree for Change-Makers</h2>
+                 <div class="card">
+                    <h3>Step 1: Is this a Schelling problem?</h3>
+                    <p>Are good intentions creating bad outcomes? Do the same patterns keep happening with different people? Are small individual preferences creating big collective problems?</p>
+                </div>
+                <div class="card decision-tree-step">
+                    <h4>Step 2: What level of change are you considering?</h4>
+                    <p><strong>A. Does your idea change what the group is trying to achieve?</strong><br>
+                    → If it changes the definition of success, it's Level 3 (Goals).<br>
+                    → If it changes basic assumptions, it's Level 2 (Paradigm).</p>
+                    <p><strong>B. Does it change what people can do or know?</strong><br>
+                    → If it changes rules about behavior, it's Level 5 (Rules).<br>
+                    → If it changes who knows what, it's Level 6 (Information).</p>
+                    <p><strong>C. Does it change connections or timing?</strong><br>
+                    → If it changes who communicates with whom, it's Level 10 (Structure).</p>
+                    <p><strong>D. Does it just change amounts or numbers?</strong><br>
+                    → If it changes quantities or resources, it's Level 12 (Parameters).</p>
+                </div>
+            </section>
+            
+            <!-- Module 5: Common Mistakes -->
+            <section id="mistakes" class="module">
+                <h2>5. Common Mistakes and How to Avoid Them</h2>
+                <div class="card">
+                    <h3>Mistake 1: Blaming Individuals for System Problems</h3>
+                    <p><strong>Example:</strong> "People at work don't communicate well" when the real problem is separate shifts with no overlap time.</p>
+                    <p><strong>How to Catch It:</strong> Ask "Would this problem happen with completely different people in the same system?"</p>
+                </div>
+                <div class="card">
+                    <h3>Mistake 2: Parameter Solutions for Structure Problems</h3>
+                    <p><strong>Example:</strong> Working more hours (parameter) when the real issue is workflow organization (structure).</p>
+                    <p><strong>How to Catch It:</strong> Ask "Are we changing amounts or changing how things connect?"</p>
+                </div>
+                 <div class="card">
+                    <h3>Mistake 3: Forcing Integration Instead of Creating Natural Bridges</h3>
+                    <p><strong>Example:</strong> Requiring diverse collaboration instead of designing projects where diverse skills are necessary and rewarding.</p>
+                    <p><strong>How to Fix It:</strong> Design systems that work with rather than against human psychology.</p>
+                </div>
+            </section>
+            
+            <!-- Module 6: Practice Plan -->
+            <section id="practice-plan" class="module">
+                <h2>6. Your Systems Thinking Practice Plan</h2>
+                <div class="card practice-plan-week">
+                    <h3>Week 1: Recognition Practice</h3>
+                    <ul>
+                        <li><strong>Daily:</strong> Notice one system pattern in your environment (work, family, school).</li>
+                        <li><strong>Focus:</strong> Identify one Schelling dynamic where good intentions create bad outcomes.</li>
+                        <li><strong>Weekly Reflection:</strong> What level do most solutions operate at?</li>
+                    </ul>
+                </div>
+                <div class="card practice-plan-week">
+                    <h3>Week 2: Analysis Practice</h3>
+                    <ul>
+                         <li><strong>Choose Problem:</strong> Pick one coordination challenge you're part of.</li>
+                         <li><strong>Map Interventions:</strong> What's been tried at different levels?</li>
+                         <li><strong>Identify Gaps:</strong> What levels haven't been tried?</li>
+                    </ul>
+                </div>
+                 <div class="card practice-plan-week">
+                    <h3>Week 3: Design Practice</h3>
+                     <ul>
+                         <li><strong>Create Alternative:</strong> Design an intervention using deeper leverage points.</li>
+                         <li><strong>Test Approach:</strong> Try a small experiment in a group you're part of.</li>
+                         <li><strong>Track Results:</strong> Monitor what changes and what stays the same.</li>
+                    </ul>
+                </div>
+            </section>
+            
+            <!-- Module 7: Diagnosis -->
+            <section id="diagnosis" class="module">
+                <h2>7. Individual vs. System Problems <span><button id="new-case-btn" class="ai-feature-btn">✨ Generate New Case Study</button></span></h2>
+                <div class="card">
+                    <p>Most coordination problems involve <strong>both</strong> individual choices and system dynamics. Good problem-solving requires understanding which aspects need which type of intervention.</p>
+                </div>
+                <div class="card case-study">
+                    <h3>Case Study Analysis</h3>
+                    <p><strong>Scenario 1:</strong> Maria's workplace has a manager who consistently schedules people for shifts they can't work, ignores time-off requests, and yells at employees. However, other managers in the same company don't behave this way, and this manager behaves similarly in community volunteer roles.</p>
+                    <p><strong>Analysis:</strong> This is primarily an <strong>individual problem</strong>. The behavior is specific to one person and consistent across different systems/contexts. It requires individual accountability.</p>
+                </div>
+                 <div class="card case-study">
+                    <p><strong>Scenario 2:</strong> Alex's study group keeps having the same problem: people not completing their assigned parts on time. This happens in other study groups in the class too, and most students are working multiple jobs while taking full course loads.</p>
+                    <p><strong>Analysis:</strong> This is primarily a <strong>system problem</strong>. The pattern is widespread, and individuals are responding to system constraints (high workload, external pressures). The solution requires a system change (e.g., better project management tools, different course structure).</p>
+                </div>
+                 <div class="card case-study">
+                    <p><strong>Scenario 3:</strong> In Sam's family, there are frequent arguments about money, with members blaming each other. The family doesn't have a budget, but also one member has a gambling problem they're not addressing.</p>
+                    <p><strong>Analysis:</strong> This is a <strong>mixed problem</strong>. The lack of a budget is a system issue (structure/rules) that affects everyone. The gambling addiction is a serious individual issue. Both must be addressed; solving one won't fix the other.</p>
+                </div>
+            </section>
+
+            <!-- Module 8: Systems Sandbox -->
+            <section id="sandbox" class="module">
+                <h2>8. Systems Sandbox</h2>
+                <div class="card">
+                    <p>Welcome to the Sandbox! This is your space to work through real-world problems with "Syd," your AI Systems Guide. Describe a coordination challenge you're facing at work, in a study group, or in your community. Syd will help you analyze it using the concepts you've learned.</p>
+                </div>
+                <div class="ai-tutor-container">
+                    <div class="ai-tutor-chatbox" id="ai-chatbox">
+                        <!-- Chat messages will be dynamically inserted here -->
+                    </div>
+                    <div class="ai-tutor-input">
+                        <textarea id="ai-input" placeholder="Describe your situation here..." rows="3"></textarea>
+                        <button id="ai-send-btn">Send</button>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <div id="ai-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <span id="modal-close-btn" class="modal-close-btn">&times;</span>
+            <h3 id="modal-title">Syd's Insights</h3>
+            <div id="modal-body">
+                <!-- AI content will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE MANAGEMENT ---
+            const state = {
+                activeModule: 'schelling',
+                schelling: {
+                    grid: null,
+                    isRunning: false,
+                    animationFrameId: null,
+                    gridSize: 30,
+                    emptyRatio: 0.1,
+                    groupRatio: 0.5,
+                    similarityPreference: 0.3,
+                    stepsTaken: 0,
+                },
+                leverage: {
+                    activeLevel: null,
+                },
+                sandbox: {
+                    chatHistory: [],
+                    isLoading: false,
+                },
+                modal: {
+                    isOpen: false,
+                    isLoading: false,
+                }
+            };
+            
+            // --- CONSTANTS ---
+            const EMPTY = 0, RED = 1, BLUE = 2;
+            const API_KEY = "AIzaSyCDi9d-lTladymJwcrQ7HhKQgRh34FmgrE."; // IMPORTANT: PASTE YOUR GEMINI API KEY HERE
+            
+            // --- UI SELECTORS ---
+            const sidebarNav = document.querySelector('.sidebar nav');
+            const modules = document.querySelectorAll('.module');
+            const gridContainer = document.getElementById('grid-container');
+            const similaritySlider = document.getElementById('similarity-slider');
+            const similarityValue = document.getElementById('similarity-value');
+            const segregationValue = document.getElementById('segregation-value');
+            const stepBtn = document.getElementById('step-btn');
+            const runBtn = document.getElementById('run-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const debriefBtn = document.getElementById('debrief-btn');
+            const leveragePyramid = document.getElementById('leverage-pyramid');
+            const leverageDetailsContainer = document.getElementById('leverage-details');
+            const aiChatbox = document.getElementById('ai-chatbox');
+            const aiInput = document.getElementById('ai-input');
+            const aiSendBtn = document.getElementById('ai-send-btn');
+            const newCaseBtn = document.getElementById('new-case-btn');
+            const aiModal = document.getElementById('ai-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+            const modalCloseBtn = document.getElementById('modal-close-btn');
+
+            // --- NAVIGATION LOGIC ---
+            function setActiveModule(moduleId) {
+                state.activeModule = moduleId;
+                render();
+            }
+
+            sidebarNav.addEventListener('click', (e) => {
+                if (e.target.tagName === 'LI') {
+                    const moduleId = e.target.dataset.module;
+                    setActiveModule(moduleId);
+                }
+            });
+
+            // --- GENERIC API CALLER ---
+            async function getAIGeneratedContent(prompt) {
+                if (!API_KEY) {
+                    return "Error: API Key is missing. Please add your Gemini API key to the `API_KEY` constant in the script to enable AI features.";
+                }
+                
+                const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                };
+
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API request failed with status ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const aiResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (aiResponse) {
+                        return aiResponse;
+                    } else {
+                        throw new Error("Invalid response structure from API.");
+                    }
+                } catch (error) {
+                    console.error("Gemini API call failed:", error);
+                    return "Sorry, I'm having trouble connecting right now. Please check the console for errors and make sure your API key is correct.";
+                }
+            }
+            
+            // --- MODAL LOGIC ---
+            function openModal(title, body) {
+                state.modal.isOpen = true;
+                modalTitle.textContent = title;
+                modalBody.innerHTML = body.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                aiModal.style.display = 'flex';
+            }
+
+            function closeModal() {
+                state.modal.isOpen = false;
+                aiModal.style.display = 'none';
+            }
+            modalCloseBtn.addEventListener('click', closeModal);
+            aiModal.addEventListener('click', (e) => {
+                if (e.target === aiModal) {
+                    closeModal();
+                }
+            });
+
+
+            // --- SCHELLING SIMULATION LOGIC ---
+            function createGrid() {
+                const { gridSize, emptyRatio, groupRatio } = state.schelling;
+                const grid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(EMPTY));
+                const totalCells = gridSize * gridSize;
+                const emptyCellsCount = Math.floor(totalCells * emptyRatio);
+                const agentCellsCount = totalCells - emptyCellsCount;
+
+                let placedAgents = 0;
+                while(placedAgents < agentCellsCount) {
+                    const r = Math.floor(Math.random() * gridSize);
+                    const c = Math.floor(Math.random() * gridSize);
+                    if (grid[r][c] === EMPTY) {
+                        grid[r][c] = Math.random() < groupRatio ? RED : BLUE;
+                        placedAgents++;
+                    }
+                }
+                return grid;
+            }
+
+            function isUnhappy(grid, r, c) {
+                const agentType = grid[r][c];
+                if (agentType === EMPTY) return false;
+
+                let sameCount = 0, neighborCount = 0;
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        const nr = r + dr, nc = c + dc;
+
+                        if (nr >= 0 && nr < grid.length && nc >= 0 && nc < grid[0].length && grid[nr][nc] !== EMPTY) {
+                            neighborCount++;
+                            if (grid[nr][nc] === agentType) sameCount++;
+                        }
+                    }
+                }
+                if (neighborCount === 0) return false;
+                return (sameCount / neighborCount) < state.schelling.similarityPreference;
+            }
+
+            function simulationStep() {
+                const { grid } = state.schelling;
+                const unhappyAgents = [], emptyCells = [];
+                for (let r = 0; r < grid.length; r++) {
+                    for (let c = 0; c < grid[0].length; c++) {
+                        if (grid[r][c] === EMPTY) {
+                            emptyCells.push({ r, c });
+                        } else if (isUnhappy(grid, r, c)) {
+                            unhappyAgents.push({ r, c });
+                        }
+                    }
+                }
+
+                if (unhappyAgents.length > 0 && emptyCells.length > 0) {
+                    const agentToMoveIdx = Math.floor(Math.random() * unhappyAgents.length);
+                    const newSpotIdx = Math.floor(Math.random() * emptyCells.length);
+                    const agent = unhappyAgents[agentToMoveIdx];
+                    const newSpot = emptyCells[newSpotIdx];
+                    
+                    grid[newSpot.r][newSpot.c] = grid[agent.r][agent.c];
+                    grid[agent.r][agent.c] = EMPTY;
+                    state.schelling.stepsTaken++;
+                    return true;
+                }
+                return false;
+            }
+            
+            function calculateSegregation() {
+                const { grid } = state.schelling;
+                let similarNeighborPairs = 0;
+                let totalNeighborPairs = 0;
+
+                for (let r = 0; r < grid.length; r++) {
+                    for (let c = 0; c < grid[0].length; c++) {
+                        const agentType = grid[r][c];
+                        if (agentType === EMPTY) continue;
+
+                        for (let dr = -1; dr <= 1; dr++) {
+                            for (let dc = -1; dc <= 1; dc++) {
+                                if (dr === 0 && dc === 0) continue;
+                                const nr = r + dr, nc = c + dc;
+
+                                if (nr >= 0 && nr < grid.length && nc >= 0 && nc < grid[0].length && grid[nr][nc] !== EMPTY) {
+                                    totalNeighborPairs++;
+                                    if (grid[nr][nc] === agentType) {
+                                        similarNeighborPairs++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return totalNeighborPairs === 0 ? 0 : similarNeighborPairs / totalNeighborPairs;
+            }
+            
+            function gameLoop() {
+                if (!state.schelling.isRunning) return;
+                const moved = simulationStep();
+                if (!moved || state.schelling.stepsTaken > 5000) { // Safety break
+                    state.schelling.isRunning = false;
+                    render();
+                    return;
+                }
+                renderGrid();
+                updateSegregation();
+                renderDebriefButton();
+                state.schelling.animationFrameId = requestAnimationFrame(gameLoop);
+            }
+
+            similaritySlider.addEventListener('input', (e) => {
+                state.schelling.similarityPreference = parseFloat(e.target.value);
+                similarityValue.textContent = `${Math.round(state.schelling.similarityPreference * 100)}%`;
+            });
+            
+            stepBtn.addEventListener('click', () => {
+                state.schelling.isRunning = false;
+                cancelAnimationFrame(state.schelling.animationFrameId);
+                simulationStep();
+                render();
+            });
+
+            runBtn.addEventListener('click', () => {
+                state.schelling.isRunning = !state.schelling.isRunning;
+                if (state.schelling.isRunning) {
+                    gameLoop();
+                } else {
+                    cancelAnimationFrame(state.schelling.animationFrameId);
+                }
+                renderRunButton();
+            });
+
+            resetBtn.addEventListener('click', () => {
+                state.schelling.isRunning = false;
+                cancelAnimationFrame(state.schelling.animationFrameId);
+                state.schelling.grid = createGrid();
+                state.schelling.stepsTaken = 0;
+                render();
+            });
+
+            debriefBtn.addEventListener('click', async () => {
+                openModal("Schelling Debrief", "Syd is thinking...");
+                const prompt = `You are 'Syd, the Systems Guide,' a friendly and encouraging AI tutor. The user has just run the Schelling Segregation Model and observed that even a small preference for similar neighbors leads to almost complete segregation. Your goal is to help them understand the implications. Start by asking them what surprised them about the result. Then, prompt them to think of a real-world example they have personally seen that mirrors this dynamic.`;
+                const response = await getAIGeneratedContent(prompt);
+                openModal("Schelling Debrief", response); // Re-open with content
+            });
+
+            // --- LEVERAGE POINTS LOGIC ---
+            const leverageData = {
+                12: { title: "Level 12: Parameters", content: "Easy but limited. Changes the quantity but not the underlying pattern. Examples: increasing a budget, changing meeting length, raising a wage." },
+                10: { title: "Level 10: Structure", content: "More powerful. Changes relationships and information flow. Examples: creating mixed-department teams, changing a room layout, creating buddy systems." },
+                6: { title: "Level 6: Information", content: "Powerful. When people can see patterns, they often change behavior automatically. Examples: making sales figures public, creating a shared project document, making a family budget visible." },
+                5: { title: "Level 5: Rules", content: "More powerful. Changes what behaviors are possible and rewarded. Examples: allowing flexible scheduling, creating team-based evaluations instead of individual ones." },
+                3: { title: "Level 3: Goals", content: "Very powerful. When you change what you're trying to achieve, all rules and behaviors can change. Example: changing a goal from 'minimize customer complaints' to 'maximize customer satisfaction and employee wellbeing'." },
+                2: { title: "Level 2: Paradigm", content: "Most powerful. When a worldview changes, everything else naturally follows. Example: shifting the belief from 'employees are costs to minimize' to 'employees are assets to develop'." },
+            };
+
+            leveragePyramid.addEventListener('click', (e) => {
+                if (e.target.classList.contains('leverage-level')) {
+                    const level = e.target.dataset.level;
+                    state.leverage.activeLevel = state.leverage.activeLevel === level ? null : level;
+                    renderLeverageDetails();
+                }
+            });
+
+            leverageDetailsContainer.addEventListener('click', async (e) => {
+                if (e.target.classList.contains('ai-feature-btn')) {
+                    const level = e.target.dataset.level;
+                    const levelName = leverageData[level].title;
+                    openModal(`Example for ${levelName}`, "Syd is thinking...");
+                    const prompt = `You are 'Syd, the Systems Guide,' an AI tutor. Provide a clear, concise, and novel real-world example of a '${levelName}' intervention. The example should be different from the ones already in the course material. Format the response with a **Scenario:** and an **Intervention:**.`;
+                    const response = await getAIGeneratedContent(prompt);
+                    openModal(`Example for ${levelName}`, response);
+                }
+            });
+            
+            // --- DIAGNOSIS MODULE LOGIC ---
+            newCaseBtn.addEventListener('click', async () => {
+                 openModal("New Case Study", "Syd is thinking...");
+                 const prompt = `You are 'Syd, the Systems Guide,' an AI tutor. Generate a new, unique case study scenario (around 150-200 words) for a student to analyze. The scenario must contain a mix of both a clear system-level problem (e.g., poor structure, bad rules, misaligned goals) AND a clear individual-level problem (e.g., a specific person's harmful behavior, dishonesty, or lack of accountability). Present only the scenario, do not provide the analysis.`;
+                 const response = await getAIGeneratedContent(prompt);
+                 openModal("New Case Study to Analyze", response);
+            });
+
+
+            // --- AI SANDBOX LOGIC ---
+            const sandboxSystemPrompt = `You are 'Syd, the Systems Guide,' a friendly and encouraging AI tutor. Your goal is to help students understand systems thinking using the provided framework (Schelling, Leverage Points, etc.). Never give direct answers. Instead, use the Socratic method by asking insightful questions that guide the user to discover the answers themselves. When asked for examples, provide clear, relatable scenarios. Your tone is curious, patient, and supportive. Start the conversation by greeting the user and asking them to describe a problem.`;
+
+            async function callSandboxGeminiAPI() {
+                if (!API_KEY) {
+                    addMessageToChat('ai', "It looks like the API Key is missing. Please add your Gemini API key to the `API_KEY` constant in the script to enable the AI tutor.");
+                    return;
+                }
+                
+                state.sandbox.isLoading = true;
+                renderAiTutor();
+                
+                const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+
+                const payload = {
+                    contents: state.sandbox.chatHistory,
+                    systemInstruction: { parts: [{ text: sandboxSystemPrompt }] },
+                };
+
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) { throw new Error(`API request failed with status ${response.status}`); }
+                    const result = await response.json();
+                    const aiResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (aiResponse) { addMessageToChat('model', aiResponse); } 
+                    else { throw new Error("Invalid response structure from API."); }
+                } catch (error) {
+                    console.error("Gemini API call failed:", error);
+                    addMessageToChat('ai', "Sorry, I'm having trouble connecting right now. Please check the console for errors and make sure your API key is correct.");
+                } finally {
+                    state.sandbox.isLoading = false;
+                    renderAiTutor();
+                }
+            }
+            
+            function addMessageToChat(role, text) {
+                const lastMessage = state.sandbox.chatHistory[state.sandbox.chatHistory.length - 1];
+                if (!(lastMessage && lastMessage.role === role && lastMessage.parts[0].text === text)) {
+                    state.sandbox.chatHistory.push({ role, parts: [{ text }] });
+                }
+                renderAiTutor();
+            }
+
+            aiSendBtn.addEventListener('click', () => {
+                const userInput = aiInput.value.trim();
+                if (userInput && !state.sandbox.isLoading) {
+                    addMessageToChat('user', userInput);
+                    aiInput.value = '';
+                    callSandboxGeminiAPI();
+                }
+            });
+
+            aiInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    aiSendBtn.click();
+                }
+            });
+
+            // --- RENDER FUNCTIONS ---
+            function renderGrid() {
+                const { grid, gridSize } = state.schelling;
+                gridContainer.innerHTML = '';
+                gridContainer.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+                gridContainer.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
+
+                for (let r = 0; r < gridSize; r++) {
+                    for (let c = 0; c < gridSize; c++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('grid-cell');
+                        if (grid[r][c] === RED) cell.classList.add('red');
+                        else if (grid[r][c] === BLUE) cell.classList.add('blue');
+                        else cell.classList.add('empty');
+                        gridContainer.appendChild(cell);
+                    }
+                }
+            }
+            
+            function updateSegregation() {
+                const segregation = calculateSegregation();
+                segregationValue.textContent = `${(segregation * 100).toFixed(1)}%`;
+            }
+
+            function renderRunButton() {
+                runBtn.textContent = state.schelling.isRunning ? 'Stop' : 'Run';
+                stepBtn.disabled = state.schelling.isRunning;
+                resetBtn.disabled = state.schelling.isRunning;
+            }
+
+            function renderDebriefButton() {
+                debriefBtn.style.display = state.schelling.stepsTaken > 10 ? 'block' : 'none';
+            }
+
+            function renderLeverageDetails() {
+                const { activeLevel } = state.leverage;
+                leverageDetailsContainer.innerHTML = ''; // Clear previous content
+                if (activeLevel) {
+                    const data = leverageData[activeLevel];
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'leverage-content active';
+                    contentDiv.innerHTML = `
+                        <h3>${data.title}</h3>
+                        <p>${data.content}</p>
+                        <button class="ai-feature-btn" data-level="${activeLevel}">✨ Get another example</button>
+                    `;
+                    leverageDetailsContainer.appendChild(contentDiv);
+                }
+            }
+
+            function renderAiTutor() {
+                aiChatbox.innerHTML = '';
+                state.sandbox.chatHistory.forEach(message => {
+                    const role = message.role === 'model' || message.role === 'ai' ? 'ai' : 'user';
+                    const messageEl = document.createElement('div');
+                    messageEl.classList.add('chat-message', `${role}-message`);
+                    let htmlContent = message.parts[0].text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                    htmlContent = htmlContent.replace(/\n/g, '<br>');
+                    messageEl.innerHTML = `<p>${htmlContent}</p>`;
+                    aiChatbox.appendChild(messageEl);
+});
+                
+                if (state.sandbox.isLoading) {
+                    const loadingEl = document.createElement('div');
+                    loadingEl.classList.add('chat-message', 'ai-message');
+                    loadingEl.innerHTML = `<p>Syd is thinking...</p>`;
+                    aiChatbox.appendChild(loadingEl);
+                }
+
+                aiChatbox.scrollTop = aiChatbox.scrollHeight;
+                aiSendBtn.disabled = state.sandbox.isLoading;
+                aiInput.disabled = state.sandbox.isLoading;
+            }
+
+            function render() {
+                // Update navigation
+                document.querySelectorAll('.sidebar nav li').forEach(li => {
+                    li.classList.toggle('active', li.dataset.module === state.activeModule);
+                });
+
+                // Update visible module
+                modules.forEach(module => {
+                    module.classList.toggle('active', module.id === state.activeModule);
+                });
+
+                // Module-specific renders
+                if (state.activeModule === 'schelling') {
+                    renderGrid();
+                    updateSegregation();
+                    renderRunButton();
+                    renderDebriefButton();
+                }
+                if (state.activeModule === 'leverage') {
+                    renderLeverageDetails();
+                }
+                if (state.activeModule === 'sandbox') {
+                    if (state.sandbox.chatHistory.length === 0) {
+                       addMessageToChat('ai', "Hello! I'm Syd, your Systems Guide. To get started, please describe a coordination challenge you're currently facing. I'll help you analyze it.");
+                    }
+                    renderAiTutor();
+                }
+            }
+
+            // --- INITIALIZATION ---
+            function init() {
+                state.schelling.grid = createGrid();
+                render();
+            }
+
+            init();
+        });
+    </script>
+</body>
+</html>
+
