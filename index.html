@@ -223,13 +223,19 @@
             display: block;
         }
 
-        /* AI Tutor Styles */
-        .ai-tutor-container {
+        /* AI Tutor and Modal Chat Styles */
+        .ai-tutor-container, .modal-chat-container {
             background-color: var(--ai-tutor-bg);
             border-radius: 8px;
             padding: 1.5rem;
             margin-top: 2rem;
             border: 1px solid #b3e5fc;
+        }
+        .modal-chat-container {
+            padding: 0;
+            margin-top: 1rem;
+            border: none;
+            background-color: transparent;
         }
 
         .ai-tutor-chatbox {
@@ -245,22 +251,30 @@
         .chat-message {
             margin-bottom: 1rem;
             max-width: 85%;
+            display: flex;
+            flex-direction: column;
         }
 
         .chat-message p {
             padding: 0.75rem 1rem;
             border-radius: 12px;
             margin: 0;
+            word-wrap: break-word;
         }
         
         .user-message {
             margin-left: auto;
+            align-items: flex-end;
         }
 
         .user-message p {
             background-color: var(--primary-accent);
             color: white;
             border-bottom-right-radius: 0;
+        }
+        
+        .ai-message {
+            align-items: flex-start;
         }
 
         .ai-message p {
@@ -331,6 +345,8 @@
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
             position: relative;
             animation: slideIn 0.3s ease-out;
+            display: flex;
+            flex-direction: column;
         }
 
         @keyframes slideIn {
@@ -349,12 +365,12 @@
         }
 
         #modal-body {
-            max-height: 60vh;
-            overflow-y: auto;
             line-height: 1.7;
         }
-        #modal-body p:first-child { margin-top: 0; }
-        #modal-body strong { color: var(--primary-accent); }
+        #modal-chatbox {
+            height: 40vh;
+            max-height: 500px;
+        }
 
         /* Generic UI Elements */
         .card {
@@ -640,7 +656,15 @@
             <span id="modal-close-btn" class="modal-close-btn">&times;</span>
             <h3 id="modal-title">Syd's Insights</h3>
             <div id="modal-body">
-                <!-- AI content will be injected here -->
+                 <div class="modal-chat-container">
+                    <div class="ai-tutor-chatbox" id="modal-chatbox">
+                        <!-- Modal chat messages go here -->
+                    </div>
+                    <div class="ai-tutor-input" id="modal-input-container">
+                        <textarea id="modal-ai-input" placeholder="Respond to Syd..." rows="2"></textarea>
+                        <button id="modal-ai-send-btn">Send</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -670,6 +694,8 @@
                 modal: {
                     isOpen: false,
                     isLoading: false,
+                    chatHistory: [],
+                    systemPrompt: '',
                 }
             };
             
@@ -696,7 +722,9 @@
             const newCaseBtn = document.getElementById('new-case-btn');
             const aiModal = document.getElementById('ai-modal');
             const modalTitle = document.getElementById('modal-title');
-            const modalBody = document.getElementById('modal-body');
+            const modalChatbox = document.getElementById('modal-chatbox');
+            const modalAiInput = document.getElementById('modal-ai-input');
+            const modalAiSendBtn = document.getElementById('modal-ai-send-btn');
             const modalCloseBtn = document.getElementById('modal-close-btn');
 
             // --- NAVIGATION LOGIC ---
@@ -711,18 +739,52 @@
                     setActiveModule(moduleId);
                 }
             });
-
-            // --- GENERIC API CALLER ---
-            async function getAIGeneratedContent(prompt) {
+            
+            // --- MODAL DIALOGUE LOGIC ---
+            async function startModalConversation(title, systemPrompt) {
                 if (!API_KEY) {
-                    return "Error: API Key is missing. Please add your Gemini API key to the `API_KEY` constant in the script to enable AI features.";
+                    state.modal.chatHistory = [];
+                    modalTitle.textContent = title;
+                    addMessageToModalChat('ai', "Error: API Key is missing. Please add your Gemini API key to enable this feature.");
+                    aiModal.style.display = 'flex';
+                    state.modal.isLoading = true; // Disables the input field
+                    renderModalChat();
+                    return;
                 }
+
+                state.modal.systemPrompt = systemPrompt;
+                state.modal.chatHistory = [];
+                state.modal.isLoading = true;
                 
+                modalTitle.textContent = title;
+                aiModal.style.display = 'flex';
+                renderModalChat();
+                
+                // This call now generates the *first* message based on the system prompt.
+                await callModalGeminiAPI(true); 
+            }
+
+            async function callModalGeminiAPI(isFirstMessage = false) {
+                state.modal.isLoading = true;
+                renderModalChat();
+
                 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
                 
-                const payload = {
-                    contents: [{ parts: [{ text: prompt }] }],
-                };
+                let payload;
+                if (isFirstMessage) {
+                    // For the first message, we send a simple prompt to kick things off.
+                    payload = {
+                        contents: [{ parts: [{ text: "Start the conversation." }] }],
+                        systemInstruction: { parts: [{ text: state.modal.systemPrompt }] },
+                    };
+                } else {
+                    // For subsequent messages, we send the whole chat history.
+                    payload = {
+                        contents: state.modal.chatHistory,
+                        systemInstruction: { parts: [{ text: state.modal.systemPrompt }] },
+                    };
+                }
+
 
                 try {
                     const response = await fetch(API_URL, {
@@ -730,32 +792,45 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
-                    
-                    if (!response.ok) {
-                        throw new Error(`API request failed with status ${response.status}`);
-                    }
-
+                    if (!response.ok) throw new Error(`API Error: ${response.status}`);
                     const result = await response.json();
                     const aiResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
                     if (aiResponse) {
-                        return aiResponse;
+                        addMessageToModalChat('model', aiResponse);
                     } else {
-                        throw new Error("Invalid response structure from API.");
+                         // Gracefully handle cases where the API returns no content
+                        const errorText = result.promptFeedback ? JSON.stringify(result.promptFeedback) : "Invalid API response structure.";
+                        throw new Error(errorText);
                     }
                 } catch (error) {
-                    console.error("Gemini API call failed:", error);
-                    return "Sorry, I'm having trouble connecting right now. Please check the console for errors and make sure your API key is correct.";
+                    console.error("Modal Gemini API call failed:", error);
+                    addMessageToModalChat('ai', `Sorry, I encountered an error. Please check the console and try again. Details: ${error.message}`);
+                } finally {
+                    state.modal.isLoading = false;
+                    renderModalChat();
                 }
             }
-            
-            // --- MODAL LOGIC ---
-            function openModal(title, body) {
-                state.modal.isOpen = true;
-                modalTitle.textContent = title;
-                modalBody.innerHTML = body.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                aiModal.style.display = 'flex';
+
+            function addMessageToModalChat(role, text) {
+                state.modal.chatHistory.push({ role, parts: [{ text }] });
+                renderModalChat();
             }
+            
+            modalAiSendBtn.addEventListener('click', () => {
+                const userInput = modalAiInput.value.trim();
+                if (userInput && !state.modal.isLoading) {
+                    addMessageToModalChat('user', userInput);
+                    modalAiInput.value = '';
+                    callModalGeminiAPI();
+                }
+            });
+
+            modalAiInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    modalAiSendBtn.click();
+                }
+            });
 
             function closeModal() {
                 state.modal.isOpen = false;
@@ -908,11 +983,9 @@
                 render();
             });
 
-            debriefBtn.addEventListener('click', async () => {
-                openModal("Schelling Debrief", "Syd is thinking...");
-                const prompt = `You are 'Syd, the Systems Guide,' a friendly and encouraging AI tutor. The user has just run the Schelling Segregation Model and observed that even a small preference for similar neighbors leads to almost complete segregation. Your goal is to help them understand the implications. Start by asking them what surprised them about the result. Then, prompt them to think of a real-world example they have personally seen that mirrors this dynamic.`;
-                const response = await getAIGeneratedContent(prompt);
-                openModal("Schelling Debrief", response); // Re-open with content
+            debriefBtn.addEventListener('click', () => {
+                const prompt = `You are 'Syd, the Systems Guide,' a friendly and encouraging AI tutor. The user has just run the Schelling Segregation Model. Your goal is to help them understand the implications through a Socratic dialogue. Start by asking them what surprised them about the result. Then, based on their answer, prompt them to think of a real-world example they have personally seen that mirrors this dynamic. Keep your responses concise and always end with a question to encourage dialogue.`;
+                startModalConversation("Schelling Debrief", prompt);
             });
 
             // --- LEVERAGE POINTS LOGIC ---
@@ -933,23 +1006,19 @@
                 }
             });
 
-            leverageDetailsContainer.addEventListener('click', async (e) => {
+            leverageDetailsContainer.addEventListener('click', (e) => {
                 if (e.target.classList.contains('ai-feature-btn')) {
                     const level = e.target.dataset.level;
                     const levelName = leverageData[level].title;
-                    openModal(`Example for ${levelName}`, "Syd is thinking...");
-                    const prompt = `You are 'Syd, the Systems Guide,' an AI tutor. Provide a clear, concise, and novel real-world example of a '${levelName}' intervention. The example should be different from the ones already in the course material. Format the response with a **Scenario:** and an **Intervention:**.`;
-                    const response = await getAIGeneratedContent(prompt);
-                    openModal(`Example for ${levelName}`, response);
+                    const prompt = `You are 'Syd, the Systems Guide,' an AI tutor. The user wants a new example of a '${levelName}' intervention. Provide a clear, concise, and novel real-world example. Then, ask the user a question to prompt them to think more deeply about it or provide their own example. Keep your initial response to two paragraphs max.`;
+                    startModalConversation(`Dialogue: ${levelName}`, prompt);
                 }
             });
             
             // --- DIAGNOSIS MODULE LOGIC ---
-            newCaseBtn.addEventListener('click', async () => {
-                 openModal("New Case Study", "Syd is thinking...");
-                 const prompt = `You are 'Syd, the Systems Guide,' an AI tutor. Generate a new, unique case study scenario (around 150-200 words) for a student to analyze. The scenario must contain a mix of both a clear system-level problem (e.g., poor structure, bad rules, misaligned goals) AND a clear individual-level problem (e.g., a specific person's harmful behavior, dishonesty, or lack of accountability). Present only the scenario, do not provide the analysis.`;
-                 const response = await getAIGeneratedContent(prompt);
-                 openModal("New Case Study to Analyze", response);
+            newCaseBtn.addEventListener('click', () => {
+                 const prompt = `You are 'Syd, the Systems Guide,' an AI tutor. Generate a new, unique case study scenario (around 150 words) for a student to analyze. The scenario must contain a mix of a system-level problem and an individual-level problem. Present only the scenario, then ask the user: "Based on this scenario, what do you think is the system problem, and what is the individual problem?"`;
+                 startModalConversation("New Case Study Dialogue", prompt);
             });
 
 
@@ -984,10 +1053,13 @@
                     const aiResponse = result.candidates?.[0]?.content?.parts?.[0]?.text;
 
                     if (aiResponse) { addMessageToChat('model', aiResponse); } 
-                    else { throw new Error("Invalid response structure from API."); }
+                    else { 
+                        const errorText = result.promptFeedback ? JSON.stringify(result.promptFeedback) : "Invalid API response structure.";
+                        throw new Error(errorText);
+                    }
                 } catch (error) {
                     console.error("Gemini API call failed:", error);
-                    addMessageToChat('ai', "Sorry, I'm having trouble connecting right now. Please check the console for errors and make sure your API key is correct.");
+                    addMessageToChat('ai', `Sorry, I'm having trouble connecting right now. Please check the console for errors and make sure your API key is correct. Details: ${error.message}`);
                 } finally {
                     state.sandbox.isLoading = false;
                     renderAiTutor();
@@ -1067,6 +1139,29 @@
                     leverageDetailsContainer.appendChild(contentDiv);
                 }
             }
+            
+            function renderModalChat() {
+                modalChatbox.innerHTML = '';
+                state.modal.chatHistory.forEach(message => {
+                    const role = message.role === 'model' || message.role === 'ai' ? 'ai' : 'user';
+                    const messageEl = document.createElement('div');
+                    messageEl.classList.add('chat-message', `${role}-message`);
+                    let htmlContent = message.parts[0].text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+                    messageEl.innerHTML = `<p>${htmlContent}</p>`;
+                    modalChatbox.appendChild(messageEl);
+                });
+                
+                if (state.modal.isLoading) {
+                    const loadingEl = document.createElement('div');
+                    loadingEl.classList.add('chat-message', 'ai-message');
+                    loadingEl.innerHTML = `<p>Syd is thinking...</p>`;
+                    modalChatbox.appendChild(loadingEl);
+                }
+
+                modalChatbox.scrollTop = modalChatbox.scrollHeight;
+                modalAiSendBtn.disabled = state.modal.isLoading;
+                modalAiInput.disabled = state.modal.isLoading;
+            }
 
             function renderAiTutor() {
                 aiChatbox.innerHTML = '';
@@ -1074,11 +1169,10 @@
                     const role = message.role === 'model' || message.role === 'ai' ? 'ai' : 'user';
                     const messageEl = document.createElement('div');
                     messageEl.classList.add('chat-message', `${role}-message`);
-                    let htmlContent = message.parts[0].text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                    htmlContent = htmlContent.replace(/\n/g, '<br>');
+                    let htmlContent = message.parts[0].text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
                     messageEl.innerHTML = `<p>${htmlContent}</p>`;
                     aiChatbox.appendChild(messageEl);
-});
+                });
                 
                 if (state.sandbox.isLoading) {
                     const loadingEl = document.createElement('div');
