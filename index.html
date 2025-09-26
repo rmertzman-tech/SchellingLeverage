@@ -493,8 +493,7 @@
                 </ul>
             </nav>
             <div class="external-link">
-                <!-- TODO: Update this href when the Workbench app is deployed -->
-                <a href="workbench.html" target="_blank">Open Ethics Workbench ↗</a>
+                <a href="https://rmertzman-tech.github.io/SysEthWorkbench/" target="_blank">Open Ethics Workbench ↗</a>
             </div>
         </aside>
         <main class="content">
@@ -1166,6 +1165,11 @@
             }
             
             function renderModalChat() {
+                const modalChatbox = document.getElementById('modal-chatbox');
+                const modalInput = document.getElementById('modal-ai-input');
+                const modalSendBtn = document.getElementById('modal-ai-send-btn');
+                if (!modalChatbox || !modalInput || !modalSendBtn) return;
+
                 modalChatbox.innerHTML = '';
                 state.modal.chatHistory.forEach(message => {
                     const role = message.role === 'model' || message.role === 'ai' ? 'ai' : 'user';
@@ -1184,8 +1188,8 @@
                 }
 
                 modalChatbox.scrollTop = modalChatbox.scrollHeight;
-                modalAiSendBtn.disabled = state.modal.isLoading;
-                modalAiInput.disabled = state.modal.isLoading;
+                modalSendBtn.disabled = state.modal.isLoading;
+                modalInput.disabled = state.modal.isLoading;
             }
 
             function renderAiTutor() {
