@@ -619,17 +619,17 @@
                 <div class="card practice-plan-week">
                     <h3>Week 2: Analysis Practice</h3>
                     <ul>
-                         <li><strong>Choose Problem:</strong> Pick one coordination challenge you're part of.</li>
-                         <li><strong>Map Interventions:</strong> What's been tried at different levels?</li>
-                         <li><strong>Identify Gaps:</strong> What levels haven't been tried?</li>
+                          <li><strong>Choose Problem:</strong> Pick one coordination challenge you're part of.</li>
+                          <li><strong>Map Interventions:</strong> What's been tried at different levels?</li>
+                          <li><strong>Identify Gaps:</strong> What levels haven't been tried?</li>
                     </ul>
                 </div>
                  <div class="card practice-plan-week">
                     <h3>Week 3: Design Practice</h3>
-                     <ul>
-                         <li><strong>Create Alternative:</strong> Design an intervention using deeper leverage points.</li>
-                         <li><strong>Test Approach:</strong> Try a small experiment in a group you're part of.</li>
-                         <li><strong>Track Results:</strong> Monitor what changes and what stays the same.</li>
+                      <ul>
+                          <li><strong>Create Alternative:</strong> Design an intervention using deeper leverage points.</li>
+                          <li><strong>Test Approach:</strong> Try a small experiment in a group you're part of.</li>
+                          <li><strong>Track Results:</strong> Monitor what changes and what stays the same.</li>
                     </ul>
                 </div>
             </section>
@@ -769,7 +769,7 @@
                 if (!API_KEY) {
                     state.modal.chatHistory = [];
                     modalTitle.textContent = title;
-                    addMessageToModalChat('ai', "Error: API Key is missing. Please add your Gemini API key to enable this feature.");
+                    addMessageToModalChat('model', "Error: API Key is missing. Please add your Gemini API key to enable this feature.");
                     aiModal.style.display = 'flex';
                     state.modal.isLoading = true; // Disables the input field
                     renderModalChat();
@@ -784,7 +784,6 @@
                 aiModal.style.display = 'flex';
                 renderModalChat();
                 
-                // This call now generates the *first* message based on the system prompt.
                 await callModalGeminiAPI(true); 
             }
 
@@ -794,21 +793,12 @@
 
                 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
                 
-                let payload;
-                if (isFirstMessage) {
-                    // For the first message, we send a simple prompt to kick things off.
-                    payload = {
-                        contents: [{ parts: [{ text: "Start the conversation." }] }],
-                        systemInstruction: { parts: [{ text: state.modal.systemPrompt }] },
-                    };
-                } else {
-                    // For subsequent messages, we send the whole chat history.
-                    payload = {
-                        contents: state.modal.chatHistory,
-                        systemInstruction: { parts: [{ text: state.modal.systemPrompt }] },
-                    };
-                }
-
+                const payload = {
+                     contents: isFirstMessage 
+                        ? [{ role: 'user', parts: [{ text: "Start the conversation." }] }]
+                        : state.modal.chatHistory,
+                     systemInstruction: { parts: [{ text: state.modal.systemPrompt }] },
+                };
 
                 try {
                     const response = await fetch(API_URL, {
@@ -822,13 +812,12 @@
                     if (aiResponse) {
                         addMessageToModalChat('model', aiResponse);
                     } else {
-                         // Gracefully handle cases where the API returns no content
                         const errorText = result.promptFeedback ? JSON.stringify(result.promptFeedback) : "Invalid API response structure.";
                         throw new Error(errorText);
                     }
                 } catch (error) {
                     console.error("Modal Gemini API call failed:", error);
-                    addMessageToModalChat('ai', `Sorry, I encountered an error. Please check the console and try again. Details: ${error.message}`);
+                    addMessageToModalChat('model', `Sorry, I encountered an error. Please check the console and try again. Details: ${error.message}`);
                 } finally {
                     state.modal.isLoading = false;
                     renderModalChat();
@@ -1051,7 +1040,7 @@
 
             async function callSandboxGeminiAPI() {
                 if (!API_KEY) {
-                    addMessageToChat('ai', "It looks like the API Key is missing. Please add your Gemini API key to the `API_KEY` constant in the script to enable the AI tutor.");
+                    addMessageToChat('model', "It looks like the API Key is missing. Please add your Gemini API key to the `API_KEY` constant in the script to enable the AI tutor.");
                     return;
                 }
                 
@@ -1083,7 +1072,7 @@
                     }
                 } catch (error) {
                     console.error("Gemini API call failed:", error);
-                    addMessageToChat('ai', `Sorry, I'm having trouble connecting right now. Please check the console for errors and make sure your API key is correct. Details: ${error.message}`);
+                    addMessageToChat('model', `Sorry, I'm having trouble connecting right now. Please check the console for errors and make sure your API key is correct. Details: ${error.message}`);
                 } finally {
                     state.sandbox.isLoading = false;
                     renderAiTutor();
@@ -1091,6 +1080,7 @@
             }
             
             function addMessageToChat(role, text) {
+                // Prevent duplicate messages from being added, especially the initial AI greeting
                 const lastMessage = state.sandbox.chatHistory[state.sandbox.chatHistory.length - 1];
                 if (!(lastMessage && lastMessage.role === role && lastMessage.parts[0].text === text)) {
                     state.sandbox.chatHistory.push({ role, parts: [{ text }] });
@@ -1172,7 +1162,7 @@
 
                 modalChatbox.innerHTML = '';
                 state.modal.chatHistory.forEach(message => {
-                    const role = message.role === 'model' || message.role === 'ai' ? 'ai' : 'user';
+                    const role = message.role === 'model' ? 'ai' : 'user';
                     const messageEl = document.createElement('div');
                     messageEl.classList.add('chat-message', `${role}-message`);
                     let htmlContent = message.parts[0].text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
@@ -1194,8 +1184,18 @@
 
             function renderAiTutor() {
                 aiChatbox.innerHTML = '';
+
+                // Display initial greeting if chat history is empty
+                if (state.sandbox.chatHistory.length === 0 && !state.sandbox.isLoading) {
+                    const initialMessage = "Hello! I'm Syd, your Systems Guide. To get started, please describe a coordination challenge you're currently facing. I'll help you analyze it.";
+                     const messageEl = document.createElement('div');
+                    messageEl.classList.add('chat-message', 'ai-message');
+                    messageEl.innerHTML = `<p>${initialMessage}</p>`;
+                    aiChatbox.appendChild(messageEl);
+                }
+
                 state.sandbox.chatHistory.forEach(message => {
-                    const role = message.role === 'model' || message.role === 'ai' ? 'ai' : 'user';
+                    const role = message.role === 'model' ? 'ai' : 'user';
                     const messageEl = document.createElement('div');
                     messageEl.classList.add('chat-message', `${role}-message`);
                     let htmlContent = message.parts[0].text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
@@ -1237,9 +1237,6 @@
                     renderLeverageDetails();
                 }
                 if (state.activeModule === 'sandbox') {
-                    if (state.sandbox.chatHistory.length === 0) {
-                       addMessageToChat('ai', "Hello! I'm Syd, your Systems Guide. To get started, please describe a coordination challenge you're currently facing. I'll help you analyze it.");
-                    }
                     renderAiTutor();
                 }
             }
@@ -1255,4 +1252,3 @@
     </script>
 </body>
 </html>
-
